@@ -3,7 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-void TransferProtocol::sendMessage(QTcpSocket *socket, const QString &msg, const QVariant &from) {
+void TransferProtocol::sendMessage(QTcpSocket *socket, const QString &msg, const QVariant &from, const QVariant &to) {
     if (!socket) return;
     if (!socket->isOpen()) return;
 
@@ -11,6 +11,7 @@ void TransferProtocol::sendMessage(QTcpSocket *socket, const QString &msg, const
     recordObject.insert("msg", msg);
     recordObject.insert("from", from.toString());
     recordObject.insert("type", TransferProtocol::NewMessage);
+    recordObject.insert("to", to.toString());
     QJsonDocument message(recordObject);
 
     QDataStream stream(socket);
@@ -21,7 +22,6 @@ void TransferProtocol::sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc
     if (!socket) return;
     if (!socket->isOpen()) return;
 
-    qDebug() << desc;
     QJsonObject recordObject;
     recordObject.insert("descriptor", desc);
     recordObject.insert("type", TransferProtocol::NewUsers);

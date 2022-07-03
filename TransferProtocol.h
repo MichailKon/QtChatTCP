@@ -1,5 +1,5 @@
 #ifndef TRANSFER_PROTOCOL_H
-#define CLIENT_MAINWINDOW_H
+#define TRANSFER_PROTOCOL_H
 
 #include <QtNetwork/QTcpSocket>
 #include <QString>
@@ -18,7 +18,7 @@ namespace TransferProtocol {
         TP_1_0_0
     };
 
-    void sendMessage(QTcpSocket *socket, const QString &msg, const QVariant &from);
+    void sendMessage(QTcpSocket *socket, const QString &msg, const QVariant &from, const QVariant &to);
 
     void sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc);
 

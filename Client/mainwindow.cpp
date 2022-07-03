@@ -44,17 +44,9 @@ void mainwindow::sendMessageButtonClicked() {
     if (!socket) return;
     if (!socket->isOpen()) return;
     QString msg = ui->lineEdit->text();
-
-    QJsonObject message;
-    message.insert("msg", msg);
-    message.insert("type", TransferProtocol::NewMessage);
-    message.insert("to", ui->comboBox->currentText());
-    showMessage(QString("Message sent to %1: %2").arg(message["to"].toString(), msg));
-
-    QDataStream stream(socket);
-    stream << message;
-
     ui->lineEdit->clear();
+    showMessage(QString("Message sent to %1: %2").arg(ui->comboBox->currentText(), msg));
+    TransferProtocol::sendMessage(socket, msg, (int)socket->socketDescriptor(), ui->comboBox->currentText());
 }
 
 void mainwindow::discardSocket() {

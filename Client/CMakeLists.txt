@@ -14,7 +14,7 @@ find_package(Qt6 COMPONENTS
         Network
         REQUIRED)
 
-add_executable(Client main.cpp mainwindow.cpp mainwindow.h mainwindow.ui ../TransferProtocol.cpp)
+add_executable(Client main.cpp mainwindow.cpp mainwindow.h mainwindow.ui ../TransferProtocol.cpp ../TransferProtocol.h)
 target_link_libraries(Client
         Qt::Core
         Qt::Gui
@@ -50,3 +50,7 @@ if (WIN32)
                 "$<TARGET_FILE_DIR:${PROJECT_NAME}>")
     endforeach (QT_LIB)
 endif ()
+
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(DEBUG_SUFFIX "d")
+endif()

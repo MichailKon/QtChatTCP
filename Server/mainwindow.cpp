@@ -79,7 +79,7 @@ void mainwindow::sendMessageButtonClicked() {
     while (it != con2desc.end()) {
         if (ui->comboBox->currentText() == allChat ||
             ui->comboBox->currentText().toInt() == it.value()) {
-            TransferProtocol::sendMessage(it.key(), msg, TransferProtocol::SERVER);
+            TransferProtocol::sendMessage(it.key(), msg, TransferProtocol::SERVER, it.value());
         }
         ++it;
     }
@@ -125,10 +125,11 @@ void mainwindow::readSocket() {
                 TransferProtocol::sendMessage(socket,
                                               tr("User %1 disconnected before getting your message").arg(
                                                       data["to"].toString()),
-                                              TransferProtocol::SERVER);
+                                              TransferProtocol::SERVER,
+                                              (int)socket->socketDescriptor());
             }
             int desc = (int) socket->socketDescriptor();
-            TransferProtocol::sendMessage(desc2con.value(toDesc), doc["msg"].toString(), desc);
+            TransferProtocol::sendMessage(desc2con.value(toDesc), doc["msg"].toString(), desc, toDesc);
         } else {
             QString message = QString("%1 :: %2");
             message = message.arg(QString::number(socket->socketDescriptor()), doc["msg"].toString());
