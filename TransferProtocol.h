@@ -25,6 +25,8 @@ namespace TransferProtocol {
     void sendDeadGuyInfo(QTcpSocket *socket, const QJsonArray &desc);
 
     void sendSocketDescriptor(QTcpSocket *socket);
+
+    void sendWithHeader(QTcpSocket *socket, const QJsonObject &obj);
 }
 
 #endif

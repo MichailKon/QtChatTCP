@@ -12,10 +12,12 @@ mainwindow::mainwindow(QWidget *parent) :
     setWindowTitle("Server");
     ui->setupUi(this);
     ui->comboBox->addItem(allChat);
+    nextBlock = 0;
 
     server = new QTcpServer();
     if (server->listen(QHostAddress::Any, 8080)) {
         connect(this, &mainwindow::newMessage, this, &mainwindow::showMessage);
+        connect(this, &mainwindow::newData, this, &mainwindow::handleData);
         connect(server, &QTcpServer::newConnection, this, &mainwindow::newConnection);
         ui->statusBar->showMessage("Waiting...");
     } else {
@@ -24,6 +26,9 @@ mainwindow::mainwindow(QWidget *parent) :
         exit(EXIT_FAILURE);
     }
 
+    keyEnter = new QShortcut(this);
+    keyEnter->setKey(Qt::Key_Return);
+    connect(keyEnter, &QShortcut::activated, ui->pushButton, &QPushButton::click);
     connect(ui->pushButton, &QPushButton::clicked, this, &mainwindow::sendMessageButtonClicked);
 }
 
@@ -40,6 +45,7 @@ mainwindow::~mainwindow() {
     desc2con.clear(), con2desc.clear();
     server->close();
     server->deleteLater();
+    keyEnter->deleteLater();
 }
 
 void mainwindow::newConnection() {
@@ -59,20 +65,28 @@ void mainwindow::appendToSockets(QTcpSocket *socket) {
         curGuys.append(it.value());
         ++it;
     }
-//    TransferProtocol::sendSocketDescriptor(socket);
+    TransferProtocol::sendSocketDescriptor(socket);
     TransferProtocol::sendNewGuyInfo(socket, curGuys);
 
     con2desc[socket] = (int) socket->socketDescriptor();
     desc2con[(int) socket->socketDescriptor()] = socket;
     ui->comboBox->addItem(QString::number(socket->socketDescriptor()));
-    showMessage(QString("INFO :: %1 connected").arg(socket->socketDescriptor()));
+    showMessage(QString("INFO :: %1 connected").arg(socket->socketDescriptor()), InfoMessage);
 }
 
-void mainwindow::showMessage(const QString &msg) {
+void mainwindow::showMessage(QString msg, SHOW_MESSAGE_TYPES from) {
+    if (from == InfoMessage) {
+        msg = tr("<span style=\"color:RED\">%1</span>").arg(msg);
+    } else if (from == SentMessage) {
+        msg = tr("<span style=\"color:BLUE\">%1</span>").arg(msg);
+    }
     ui->textBrowser->append(msg);
 }
 
 void mainwindow::sendMessageButtonClicked() {
+    if (ui->lineEdit->text().isEmpty()) {
+        return;
+    }
     QString msg = ui->lineEdit->text();
     ui->lineEdit->clear();
     auto it = con2desc.begin();
@@ -83,7 +97,11 @@ void mainwindow::sendMessageButtonClicked() {
         }
         ++it;
     }
-    showMessage(QString("SERVER :: %1").arg(msg));
+    if (ui->comboBox->currentText() == allChat) {
+        showMessage(QString("Server -> ALL: %1").arg(msg), SentMessage);
+    } else {
+        showMessage(QString("Server -> %1: %2").arg(ui->comboBox->currentText(), msg), SentMessage);
+    }
 }
 
 void mainwindow::readSocket() {
@@ -91,13 +109,50 @@ void mainwindow::readSocket() {
 
     QByteArray buffer;
 
-    QDataStream stream(socket);
-    stream.setVersion(QDataStream::Qt_6_3);
+    QDataStream in(socket);
+    in.setVersion(QDataStream::Qt_6_3);
 
-    stream.startTransaction();
-    stream >> buffer;
+    forever {
+        if (nextBlock == 0) {
+            if (socket->bytesAvailable() < sizeof(qint32)) {
+                break;
+            }
+            in >> nextBlock;
+        }
+        if (socket->bytesAvailable() < nextBlock) {
+            break;
+        }
+        in >> buffer;
 
-    QJsonDocument doc = QJsonDocument::fromJson(buffer);
+        QJsonDocument doc = QJsonDocument::fromJson(buffer);
+        emit newData(socket, doc);
+
+        buffer.clear();
+        nextBlock = 0;
+    }
+}
+
+void mainwindow::discardSocket() {
+    auto *socket = (QTcpSocket *) sender();
+    auto it = con2desc.find(socket);
+    if (it != con2desc.end()) {
+        int dead = it.value();
+        showMessage(QString("INFO :: %1 disconnected").arg(dead), InfoMessage);
+
+        auto it1 = con2desc.begin();
+        while (it1 != con2desc.end()) {
+            TransferProtocol::sendDeadGuyInfo(it1.key(), {dead});
+            ++it1;
+        }
+
+        ui->comboBox->removeItem(ui->comboBox->findText(QString::number(dead)));
+        desc2con.remove(dead);
+        con2desc.remove(it.key());
+    }
+    socket->deleteLater();
+}
+
+void mainwindow::handleData(QTcpSocket *socket, const QJsonDocument &doc) {
     if (doc.isNull() || !doc.isObject()) {
         return;
     }
@@ -107,11 +162,6 @@ void mainwindow::readSocket() {
     }
 
     int type = TransferProtocol::DATA_TYPES(data["type"].toInt());
-
-    if (!stream.commitTransaction()) {
-        QMessageBox::critical(this, "Server", "WTF");
-        return;
-    }
 
     if (type == TransferProtocol::NewMessage) {
         if (!data.contains("to") || !data.contains("msg")) {
@@ -133,28 +183,8 @@ void mainwindow::readSocket() {
         } else {
             QString message = QString("%1 :: %2");
             message = message.arg(QString::number(socket->socketDescriptor()), doc["msg"].toString());
-            emit newMessage(message);
+            emit newMessage(message, NormalMessage);
         }
         delete (isNum);
     }
-}
-
-void mainwindow::discardSocket() {
-    auto *socket = (QTcpSocket *) sender();
-    auto it = con2desc.find(socket);
-    if (it != con2desc.end()) {
-        int dead = it.value();
-        showMessage(QString("INFO :: A client %1 has just left the room").arg(dead));
-
-        auto it1 = con2desc.begin();
-        while (it1 != con2desc.end()) {
-            TransferProtocol::sendDeadGuyInfo(it1.key(), {dead});
-            ++it1;
-        }
-
-        ui->comboBox->removeItem(ui->comboBox->findText(QString::number(dead)));
-        desc2con.remove(dead);
-        con2desc.remove(it.key());
-    }
-    socket->deleteLater();
 }

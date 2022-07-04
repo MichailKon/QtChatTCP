@@ -50,7 +50,3 @@ if (WIN32)
                 "$<TARGET_FILE_DIR:${PROJECT_NAME}>")
     endforeach (QT_LIB)
 endif ()
-
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(DEBUG_SUFFIX "d")
-endif()

@@ -12,10 +12,8 @@ void TransferProtocol::sendMessage(QTcpSocket *socket, const QString &msg, const
     recordObject.insert("from", from.toString());
     recordObject.insert("type", TransferProtocol::NewMessage);
     recordObject.insert("to", to.toString());
-    QJsonDocument message(recordObject);
 
-    QDataStream stream(socket);
-    stream << message;
+    TransferProtocol::sendWithHeader(socket, recordObject);
 }
 
 void TransferProtocol::sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc) {
@@ -25,10 +23,8 @@ void TransferProtocol::sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc
     QJsonObject recordObject;
     recordObject.insert("descriptor", desc);
     recordObject.insert("type", TransferProtocol::NewUsers);
-    QJsonDocument message(recordObject);
 
-    QDataStream stream(socket);
-    stream << message;
+    TransferProtocol::sendWithHeader(socket, recordObject);
 }
 
 void TransferProtocol::sendDeadGuyInfo(QTcpSocket *socket, const QJsonArray &desc) {
@@ -38,10 +34,8 @@ void TransferProtocol::sendDeadGuyInfo(QTcpSocket *socket, const QJsonArray &des
     QJsonObject recordObject;
     recordObject.insert("descriptor", desc);
     recordObject.insert("type", TransferProtocol::DelUsers);
-    QJsonDocument message(recordObject);
 
-    QDataStream stream(socket);
-    stream << message;
+    TransferProtocol::sendWithHeader(socket, recordObject);
 }
 
 void TransferProtocol::sendSocketDescriptor(QTcpSocket *socket) {
@@ -51,8 +45,19 @@ void TransferProtocol::sendSocketDescriptor(QTcpSocket *socket) {
     QJsonObject recordObject;
     recordObject.insert("descriptor", (int) socket->socketDescriptor());
     recordObject.insert("type", TransferProtocol::YourSocketDescriptor);
-    QJsonDocument message(recordObject);
 
-    QDataStream stream(socket);
-    stream << message;
+    TransferProtocol::sendWithHeader(socket, recordObject);
+}
+
+void TransferProtocol::sendWithHeader(QTcpSocket *socket, const QJsonObject &obj) {
+    QByteArray block;
+    QDataStream stream(&block, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_3);
+    stream << qint32(0) << obj;
+    if (stream.device()->size() > std::numeric_limits<qint32>::max() + sizeof(qint32)) {
+        return;
+    }
+    stream.device()->seek(0);
+    stream << qint32(block.size() - sizeof(qint32));
+    socket->write(block);
 }
