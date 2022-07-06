@@ -3,7 +3,10 @@
 
 #include <QWidget>
 #include <QtNetwork/QTcpSocket>
-#include <QShortcut>
+
+class QTextBrowser;
+
+class QShortcut;
 
 
 QT_BEGIN_NAMESPACE
@@ -26,7 +29,7 @@ public:
 
 signals:
 
-    void newMessage(QString msg, SHOW_MESSAGE_TYPES type);
+    void newMessage(QString msg, SHOW_MESSAGE_TYPES type, int ind);
 
     void newData(const QJsonDocument &doc);
 
@@ -36,7 +39,7 @@ private slots:
 
     void discardSocket();
 
-    void showMessage(QString msg, mainwindow::SHOW_MESSAGE_TYPES from);
+    void showMessage(QString msg, mainwindow::SHOW_MESSAGE_TYPES from, int ind);
 
     void sendMessageButtonClicked();
 
@@ -46,9 +49,14 @@ private:
     Ui::mainwindow *ui;
 
     QTcpSocket *socket;
-    QSet<int> otherSockets;
+    QVector<QVariant> otherSockets;
+    QVector<QTextBrowser *> textBrowsers;
     QShortcut *keyEnter;
     qint32 nextBlock = 0;
+    const QString allChat = "All";
+    const QString serverMessage = "Server";
+
+    void createTabWidget(const QString &title);
 };
 
 

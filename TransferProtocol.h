@@ -6,6 +6,7 @@
 
 namespace TransferProtocol {
     const QString SERVER = "Server";
+    const QString ALL = "AllChat";
 
     enum DATA_TYPES {
         NewMessage,

@@ -4,13 +4,20 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QShortcut>
+#include <QTextBrowser>
 #include "../TransferProtocol.h"
 
 
 mainwindow::mainwindow(QWidget *parent) :
         QWidget(parent), ui(new Ui::mainwindow) {
     ui->setupUi(this);
-    ui->comboBox->addItem(TransferProtocol::SERVER);
+
+    otherSockets.push_back(TransferProtocol::ALL);
+    createTabWidget(TransferProtocol::ALL);
+    otherSockets.push_back(TransferProtocol::SERVER);
+    createTabWidget(TransferProtocol::SERVER);
+
     nextBlock = 0;
 
     socket = new QTcpSocket(this);
@@ -40,13 +47,13 @@ mainwindow::~mainwindow() {
     delete ui;
 }
 
-void mainwindow::showMessage(QString msg, SHOW_MESSAGE_TYPES from) {
+void mainwindow::showMessage(QString msg, SHOW_MESSAGE_TYPES from, int ind) {
     if (from == FromServerMessage) {
         msg = tr("<span style=\"color:RED\">%1</span>").arg(msg);
     } else if (from == SentMessage) {
         msg = tr("<span style=\"color:BLUE\">%1</span>").arg(msg);
     }
-    ui->textBrowser->append(msg);
+    textBrowsers[ind]->append(msg);
 }
 
 void mainwindow::sendMessageButtonClicked() {
@@ -57,8 +64,19 @@ void mainwindow::sendMessageButtonClicked() {
     }
     QString msg = ui->lineEdit->text();
     ui->lineEdit->clear();
-    showMessage(QString("YOU -> %1: %2").arg(ui->comboBox->currentText(), msg), SentMessage);
-    TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), ui->comboBox->currentText());
+
+    int ind = ui->tabWidget->currentIndex();
+    QString curTabText = ui->tabWidget->tabText(ind);
+    if (curTabText == allChat) {
+        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
+        TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), TransferProtocol::ALL);
+    } else if (curTabText == serverMessage) {
+        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
+        TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), TransferProtocol::SERVER);
+    } else {
+        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
+        TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), otherSockets[ind]);
+    }
 }
 
 void mainwindow::discardSocket() {
@@ -107,9 +125,22 @@ void mainwindow::handleData(const QJsonDocument &doc) {
         if (!data.contains("from") || !data.contains("msg")) {
             return;
         }
-        QString message = QString("%1 :: %2").arg(doc["from"].toString(), doc["msg"].toString());
+        QString from = doc["from"].toString();
+        QString message = QString("%1 :: %2").arg(from, doc["msg"].toString());
+        int ind = (int) otherSockets.indexOf(from);
+        if (ind == -1) {
+            return;
+        }
+        if (data.value("to").toString() == TransferProtocol::ALL) {
+            ind = (int) otherSockets.indexOf(TransferProtocol::ALL);
+            if (ind == -1) {
+                QMessageBox::critical(this, "ERROR", "Can't find chat with other people");
+                return;
+            }
+        }
         emit newMessage(message,
-                        doc["from"].toString() == TransferProtocol::SERVER ? FromServerMessage : NormalMessage);
+                        doc["from"].toString() == TransferProtocol::SERVER ? FromServerMessage : NormalMessage,
+                        ind);
     } else if (type == TransferProtocol::NewUsers) {
         if (!data.contains("descriptor")) {
             return;
@@ -117,8 +148,8 @@ void mainwindow::handleData(const QJsonDocument &doc) {
         QJsonArray desc = doc["descriptor"].toArray();
         for (auto &&i: desc) {
             int de = i.toInt();
-            otherSockets.insert(de);
-            ui->comboBox->addItem(QString::number(de));
+            otherSockets.push_back(de);
+            createTabWidget(QString::number(de));
         }
     } else if (type == TransferProtocol::DelUsers) {
         if (!data.contains("descriptor")) {
@@ -127,8 +158,11 @@ void mainwindow::handleData(const QJsonDocument &doc) {
         QJsonArray desc = doc["descriptor"].toArray();
         for (auto &&i: desc) {
             int de = i.toInt();
-            otherSockets.remove(de);
-            ui->comboBox->removeItem(ui->comboBox->findText(QString::number(de)));
+            int ind = (int) otherSockets.indexOf(de);
+            ui->tabWidget->removeTab(ind);
+            otherSockets.remove(ind);
+            delete textBrowsers[ind];
+            textBrowsers.remove(ind);
         }
     } else if (type == TransferProtocol::YourSocketDescriptor) {
         if (!data.contains("descriptor")) {
@@ -136,4 +170,14 @@ void mainwindow::handleData(const QJsonDocument &doc) {
         }
         setWindowTitle(tr("Client: %1").arg(doc["descriptor"].toInt()));
     }
+}
+
+void mainwindow::createTabWidget(const QString &title) {
+    auto *tab = new QWidget();
+    auto *grid = new QGridLayout();
+    tab->setLayout(grid);
+    auto *browser = new QTextBrowser();
+    grid->addWidget(browser);
+    ui->tabWidget->addTab(tab, title);
+    textBrowsers.push_back(browser);
 }

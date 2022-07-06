@@ -167,24 +167,36 @@ void mainwindow::handleData(QTcpSocket *socket, const QJsonDocument &doc) {
         if (!data.contains("to") || !data.contains("msg")) {
             return;
         }
+        QString msg = doc["msg"].toString();
         QString to = data["to"].toString();
-        bool *isNum = new bool();
-        int toDesc = to.toInt(isNum);
-        if (*isNum) {
-            if (!desc2con.contains(toDesc)) {
-                TransferProtocol::sendMessage(socket,
-                                              tr("User %1 disconnected before getting your message").arg(
-                                                      data["to"].toString()),
-                                              TransferProtocol::SERVER,
-                                              (int)socket->socketDescriptor());
+        if (to != TransferProtocol::SERVER && to != TransferProtocol::ALL) {
+            bool *isNum = new bool();
+            int toDesc = to.toInt(isNum);
+            if (*isNum) {
+                if (!desc2con.contains(toDesc)) {
+                    TransferProtocol::sendMessage(socket,
+                                                  tr("User %1 is not connect").arg(data["to"].toString()),
+                                                  TransferProtocol::SERVER,
+                                                  (int) socket->socketDescriptor());
+                }
+                int desc = (int) socket->socketDescriptor();
+                TransferProtocol::sendMessage(desc2con.value(toDesc), msg, desc, toDesc);
             }
-            int desc = (int) socket->socketDescriptor();
-            TransferProtocol::sendMessage(desc2con.value(toDesc), doc["msg"].toString(), desc, toDesc);
-        } else {
+            delete (isNum);
+        } else if (to == TransferProtocol::SERVER) {
             QString message = QString("%1 :: %2");
-            message = message.arg(QString::number(socket->socketDescriptor()), doc["msg"].toString());
+            message = message.arg(QString::number(socket->socketDescriptor()), msg);
             emit newMessage(message, NormalMessage);
+        } else if (to == TransferProtocol::ALL) {
+            auto it = con2desc.begin();
+            while (it != con2desc.end()) {
+                if (it.key() != socket) {
+                    TransferProtocol::sendMessage(it.key(),
+                                                  msg,
+                                                  socket->socketDescriptor(), TransferProtocol::ALL);
+                }
+                ++it;
+            }
         }
-        delete (isNum);
     }
 }
