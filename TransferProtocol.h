@@ -3,6 +3,7 @@
 
 #include <QtNetwork/QTcpSocket>
 #include <QString>
+#include <QJsonArray>
 
 namespace TransferProtocol {
     const QString SERVER = "Server";
@@ -12,7 +13,8 @@ namespace TransferProtocol {
         NewMessage,
         NewUsers,
         DelUsers,
-        YourSocketDescriptor
+        YourSocketDescriptor,
+        NewUserName
     };
 
     enum VERSIONS {
@@ -21,11 +23,13 @@ namespace TransferProtocol {
 
     void sendMessage(QTcpSocket *socket, const QString &msg, const QVariant &from, const QVariant &to);
 
-    void sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc);
+    void sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc, const QJsonArray &names = {});
 
     void sendDeadGuyInfo(QTcpSocket *socket, const QJsonArray &desc);
 
     void sendSocketDescriptor(QTcpSocket *socket);
+
+    void sendUserName(QTcpSocket *socket, const QVariant &from, const QString &newName);
 
     void sendWithHeader(QTcpSocket *socket, const QJsonObject &obj);
 }

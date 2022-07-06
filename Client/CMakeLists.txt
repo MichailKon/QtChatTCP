@@ -14,7 +14,7 @@ find_package(Qt6 COMPONENTS
         Network
         REQUIRED)
 
-add_executable(Client main.cpp mainwindow.cpp mainwindow.h mainwindow.ui ../TransferProtocol.cpp ../TransferProtocol.h)
+add_executable(Client main.cpp mainwindow.cpp mainwindow.h mainwindow.ui ../TransferProtocol.cpp ../TransferProtocol.h choosename.cpp choosename.h choosename.ui)
 target_link_libraries(Client
         Qt::Core
         Qt::Gui

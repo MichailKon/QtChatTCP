@@ -58,15 +58,16 @@ void mainwindow::appendToSockets(QTcpSocket *socket) {
     connect(socket, &QTcpSocket::readyRead, this, &mainwindow::readSocket);
     connect(socket, &QTcpSocket::disconnected, this, &mainwindow::discardSocket);
 
-    QJsonArray curGuys;
+    QJsonArray curGuys, curNames;
     auto it = con2desc.begin();
     while (it != con2desc.end()) {
-        TransferProtocol::sendNewGuyInfo(it.key(), {(int) socket->socketDescriptor()});
-        curGuys.append(it.value());
+        TransferProtocol::sendNewGuyInfo(it.key(), {QString::number(socket->socketDescriptor())});
+        curGuys.append(QString::number(it.value()));
+        curNames.append(con2name[it.key()]);
         ++it;
     }
+    TransferProtocol::sendNewGuyInfo(socket, curGuys, curNames);
     TransferProtocol::sendSocketDescriptor(socket);
-    TransferProtocol::sendNewGuyInfo(socket, curGuys);
 
     con2desc[socket] = (int) socket->socketDescriptor();
     desc2con[(int) socket->socketDescriptor()] = socket;
@@ -136,7 +137,7 @@ void mainwindow::discardSocket() {
     auto *socket = (QTcpSocket *) sender();
     auto it = con2desc.find(socket);
     if (it != con2desc.end()) {
-        int dead = it.value();
+        QString dead = QString::number(it.value());
         showMessage(QString("INFO :: %1 disconnected").arg(dead), InfoMessage);
 
         auto it1 = con2desc.begin();
@@ -145,8 +146,8 @@ void mainwindow::discardSocket() {
             ++it1;
         }
 
-        ui->comboBox->removeItem(ui->comboBox->findText(QString::number(dead)));
-        desc2con.remove(dead);
+        ui->comboBox->removeItem(ui->comboBox->findText(dead));
+        desc2con.remove(dead.toInt());
         con2desc.remove(it.key());
     }
     socket->deleteLater();
@@ -197,6 +198,19 @@ void mainwindow::handleData(QTcpSocket *socket, const QJsonDocument &doc) {
                 }
                 ++it;
             }
+        }
+    } else if (type == TransferProtocol::NewUserName) {
+        if (!data.contains("name")) {
+            return;
+        }
+        QString name = data["name"].toString();
+        con2name[socket] = name;
+        auto it = con2desc.begin();
+        while (it != con2desc.end()) {
+            if (it.value() != socket->socketDescriptor()) {
+                TransferProtocol::sendUserName(it.key(), socket->socketDescriptor(), name);
+            }
+            ++it;
         }
     }
 }

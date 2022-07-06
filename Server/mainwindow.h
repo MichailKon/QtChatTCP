@@ -40,7 +40,7 @@ private slots:
 
     void appendToSockets(QTcpSocket *socket);
 
-    void showMessage(QString msg, SHOW_MESSAGE_TYPES from);
+    void showMessage(QString msg, mainwindow::SHOW_MESSAGE_TYPES from);
 
     void sendMessageButtonClicked();
 
@@ -52,6 +52,7 @@ private:
     QTcpServer *server;
     QMap<int, QTcpSocket *> desc2con;
     QMap<QTcpSocket *, int> con2desc;
+    QMap<QTcpSocket *, QString> con2name;
     QShortcut *keyEnter;
 
     const QString allChat = "Whole chat";

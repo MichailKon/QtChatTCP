@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "choosename.h"
 #include <QMessageBox>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -11,6 +12,10 @@
 
 mainwindow::mainwindow(QWidget *parent) :
         QWidget(parent), ui(new Ui::mainwindow) {
+    auto diag = new chooseName(this);
+    connect(diag, &chooseName::closed, this, &mainwindow::gotName);
+    diag->show();
+
     ui->setupUi(this);
 
     otherSockets.push_back(TransferProtocol::ALL);
@@ -126,7 +131,7 @@ void mainwindow::handleData(const QJsonDocument &doc) {
             return;
         }
         QString from = doc["from"].toString();
-        QString message = QString("%1 :: %2").arg(from, doc["msg"].toString());
+        QString message = QString("%1 :: %2").arg(otherNames.value(from, from), doc["msg"].toString());
         int ind = (int) otherSockets.indexOf(from);
         if (ind == -1) {
             return;
@@ -146,10 +151,21 @@ void mainwindow::handleData(const QJsonDocument &doc) {
             return;
         }
         QJsonArray desc = doc["descriptor"].toArray();
-        for (auto &&i: desc) {
-            int de = i.toInt();
+        QJsonArray names;
+        if (data.contains("name")) {
+            names = data["name"].toArray();
+        }
+        if (!names.empty() && desc.size() != names.size()) {
+            close();
+        }
+        for (int i = 0; i < desc.size(); i++) {
+            QString de = desc[i].toString();
             otherSockets.push_back(de);
-            createTabWidget(QString::number(de));
+            createTabWidget(de);
+            if (!names.empty()) {
+                setName(de, names[i].toString());
+                otherNames[de] = names[i].toString();
+            }
         }
     } else if (type == TransferProtocol::DelUsers) {
         if (!data.contains("descriptor")) {
@@ -157,18 +173,25 @@ void mainwindow::handleData(const QJsonDocument &doc) {
         }
         QJsonArray desc = doc["descriptor"].toArray();
         for (auto &&i: desc) {
-            int de = i.toInt();
+            QString de = i.toString();
             int ind = (int) otherSockets.indexOf(de);
             ui->tabWidget->removeTab(ind);
             otherSockets.remove(ind);
             delete textBrowsers[ind];
             textBrowsers.remove(ind);
+            otherNames.remove(de);
         }
     } else if (type == TransferProtocol::YourSocketDescriptor) {
         if (!data.contains("descriptor")) {
             return;
         }
         setWindowTitle(tr("Client: %1").arg(doc["descriptor"].toInt()));
+    } else if (type == TransferProtocol::NewUserName) {
+        if (!data.contains("from") || !data.contains("name")) {
+            return;
+        }
+        otherNames[data["from"].toString()] = data["name"].toString();
+        setName(data["from"].toString(), data["name"].toString());
     }
 }
 
@@ -180,4 +203,17 @@ void mainwindow::createTabWidget(const QString &title) {
     grid->addWidget(browser);
     ui->tabWidget->addTab(tab, title);
     textBrowsers.push_back(browser);
+}
+
+void mainwindow::gotName(const QString &name) {
+    setWindowTitle(tr("Client: %1").arg(name));
+    TransferProtocol::sendUserName(socket, "", name);
+}
+
+void mainwindow::setName(const QString &from, const QString &name) {
+    int ind = (int) otherSockets.indexOf(from);
+    if (ind == -1) {
+        return;
+    }
+    ui->tabWidget->setTabText(ind, name);
 }

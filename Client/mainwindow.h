@@ -45,18 +45,23 @@ private slots:
 
     void handleData(const QJsonDocument &doc);
 
+    void gotName(const QString &name);
+
 private:
     Ui::mainwindow *ui;
 
     QTcpSocket *socket;
-    QVector<QVariant> otherSockets;
+    QVector<QString> otherSockets;
     QVector<QTextBrowser *> textBrowsers;
     QShortcut *keyEnter;
+    QMap<QString, QString> otherNames;
     qint32 nextBlock = 0;
     const QString allChat = "All";
     const QString serverMessage = "Server";
 
     void createTabWidget(const QString &title);
+
+    void setName(const QString &from, const QString &name);
 };
 
 
