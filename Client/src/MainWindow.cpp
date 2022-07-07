@@ -1,22 +1,31 @@
-#include "mainwindow.h"
+#include "MainWindow.h"
 #include "ui_mainwindow.h"
-#include "choosename.h"
+#include "ChooseName.h"
+#include "VerticalTabBar.h"
+#include "TransferProtocol.h"
+#include "VerticalTabWidget.h"
 #include <QMessageBox>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QShortcut>
 #include <QTextBrowser>
-#include "../TransferProtocol.h"
+#include <QFile>
+#include <QtNetwork/QTcpSocket>
 
 
-mainwindow::mainwindow(QWidget *parent) :
-        QWidget(parent), ui(new Ui::mainwindow) {
-    auto diag = new chooseName(this);
-    connect(diag, &chooseName::closed, this, &mainwindow::gotName);
+MainWindow::MainWindow(QWidget *parent) :
+        QWidget(parent), ui(new Ui::MainWindow) {
+    auto diag = new ChooseName(this);
+    connect(diag, &ChooseName::closed, this, &MainWindow::gotName);
     diag->show();
 
     ui->setupUi(this);
+
+    QFile file("css/tabWidget.css");
+    file.open(QFile::ReadOnly);
+    QString styleSheet = QLatin1String(file.readAll());
+    setStyleSheet(styleSheet);
 
     otherSockets.push_back(TransferProtocol::ALL);
     createTabWidget(TransferProtocol::ALL);
@@ -29,30 +38,36 @@ mainwindow::mainwindow(QWidget *parent) :
 
     socket->connectToHost(QHostAddress::LocalHost, 8080);
     if (socket->waitForConnected()) {
-        ui->label->setText(tr("Connected to server"));
+        ui->statusBar->showMessage("Connected to server");
     } else {
         QMessageBox::critical(this, "Client", QString("The following error occurred: %1.").arg(socket->errorString()));
         exit(EXIT_FAILURE);
     }
 
-    connect(this, &mainwindow::newData, this, &mainwindow::handleData);
-    connect(this, &mainwindow::newMessage, this, &mainwindow::showMessage);
-    connect(socket, &QTcpSocket::readyRead, this, &mainwindow::readSocket);
-    connect(socket, &QTcpSocket::disconnected, this, &mainwindow::discardSocket);
-    connect(ui->pushButton, &QPushButton::clicked, this, &mainwindow::sendMessageButtonClicked);
+    connect(this, &MainWindow::newData, this, &MainWindow::handleData);
+    connect(this, &MainWindow::newMessage, this, &MainWindow::showMessage);
+    connect(socket, &QTcpSocket::readyRead, this, &MainWindow::readSocket);
+    connect(socket, &QTcpSocket::disconnected, this, &MainWindow::discardSocket);
+    connect(ui->pushButton, &QPushButton::clicked, this, &MainWindow::sendMessageButtonClicked);
     keyEnter = new QShortcut(this);
     keyEnter->setKey(Qt::Key_Return);
     connect(keyEnter, &QShortcut::activated, ui->pushButton, &QPushButton::click);
+    keyCtrlTab = new QShortcut(this);
+    keyCtrlTab->setKey(Qt::Key_Control | Qt::Key_T);
+    connect(keyCtrlTab, &QShortcut::activated, ui->tabWidget, &QTabWidget::nextInFocusChain);
 }
 
-mainwindow::~mainwindow() {
+MainWindow::~MainWindow() {
     if (socket->isOpen()) {
         socket->close();
     }
     delete ui;
 }
 
-void mainwindow::showMessage(QString msg, SHOW_MESSAGE_TYPES from, int ind) {
+void MainWindow::showMessage(QString msg, SHOW_MESSAGE_TYPES from, int ind) {
+    if (ind < 0 || ind >= textBrowsers.size()) {
+        return;
+    }
     if (from == FromServerMessage) {
         msg = tr("<span style=\"color:RED\">%1</span>").arg(msg);
     } else if (from == SentMessage) {
@@ -61,7 +76,7 @@ void mainwindow::showMessage(QString msg, SHOW_MESSAGE_TYPES from, int ind) {
     textBrowsers[ind]->append(msg);
 }
 
-void mainwindow::sendMessageButtonClicked() {
+void MainWindow::sendMessageButtonClicked() {
     if (!socket) return;
     if (!socket->isOpen()) return;
     if (ui->lineEdit->text().isEmpty()) {
@@ -76,21 +91,20 @@ void mainwindow::sendMessageButtonClicked() {
         showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
         TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), TransferProtocol::ALL);
     } else if (curTabText == serverMessage) {
-        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
-        TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), TransferProtocol::SERVER);
+        showMessage(tr("INFO :: You can't send message to server"), FromServerMessage, ind);
     } else {
         showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
         TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), otherSockets[ind]);
     }
 }
 
-void mainwindow::discardSocket() {
+void MainWindow::discardSocket() {
     socket->deleteLater();
     socket = nullptr;
-    ui->label->setText("Disconnected");
+    ui->statusBar->showMessage("Disconnected");
 }
 
-void mainwindow::readSocket() {
+void MainWindow::readSocket() {
     QByteArray buffer;
 
     QDataStream in(socket);
@@ -116,7 +130,7 @@ void mainwindow::readSocket() {
     }
 }
 
-void mainwindow::handleData(const QJsonDocument &doc) {
+void MainWindow::handleData(const QJsonDocument &doc) {
     if (doc.isNull() || !doc.isObject()) {
         return;
     }
@@ -158,20 +172,29 @@ void mainwindow::handleData(const QJsonDocument &doc) {
         if (!names.empty() && desc.size() != names.size()) {
             close();
         }
+        QStringList result;
         for (int i = 0; i < desc.size(); i++) {
             QString de = desc[i].toString();
             otherSockets.push_back(de);
             createTabWidget(de);
             if (!names.empty()) {
-                setName(de, names[i].toString());
-                otherNames[de] = names[i].toString();
+                QString name = names[i].toString();
+                setName(de, name);
+                otherNames[de] = name;
+                result << name;
+            } else {
+                result << de;
             }
         }
+
+        showMessage(tr("%1 connected").arg(result.join(" ")), FromServerMessage,
+                    (int) otherSockets.indexOf(TransferProtocol::SERVER));
     } else if (type == TransferProtocol::DelUsers) {
         if (!data.contains("descriptor")) {
             return;
         }
         QJsonArray desc = doc["descriptor"].toArray();
+        QStringList names;
         for (auto &&i: desc) {
             QString de = i.toString();
             int ind = (int) otherSockets.indexOf(de);
@@ -180,22 +203,30 @@ void mainwindow::handleData(const QJsonDocument &doc) {
             delete textBrowsers[ind];
             textBrowsers.remove(ind);
             otherNames.remove(de);
+            names << otherNames.value(de, de);
         }
+
+        showMessage(tr("%1 disconnected").arg(names.join(" ")), FromServerMessage,
+                    (int) otherSockets.indexOf(TransferProtocol::SERVER));
     } else if (type == TransferProtocol::YourSocketDescriptor) {
         if (!data.contains("descriptor")) {
             return;
         }
-        setWindowTitle(tr("Client: %1").arg(doc["descriptor"].toInt()));
+        setWindowTitle(tr("Client: %1").arg(doc["descriptor"].toString()));
     } else if (type == TransferProtocol::NewUserName) {
         if (!data.contains("from") || !data.contains("name")) {
             return;
         }
-        otherNames[data["from"].toString()] = data["name"].toString();
-        setName(data["from"].toString(), data["name"].toString());
+        QString from = data["from"].toString(), name = data["name"].toString();
+        otherNames[from] = name;
+        setName(from, name);
+
+        showMessage(tr("%1 changed name to %2").arg(from, name), FromServerMessage,
+                    (int) otherSockets.indexOf(TransferProtocol::SERVER));
     }
 }
 
-void mainwindow::createTabWidget(const QString &title) {
+void MainWindow::createTabWidget(const QString &title) {
     auto *tab = new QWidget();
     auto *grid = new QGridLayout();
     tab->setLayout(grid);
@@ -205,12 +236,12 @@ void mainwindow::createTabWidget(const QString &title) {
     textBrowsers.push_back(browser);
 }
 
-void mainwindow::gotName(const QString &name) {
+void MainWindow::gotName(const QString &name) {
     setWindowTitle(tr("Client: %1").arg(name));
     TransferProtocol::sendUserName(socket, "", name);
 }
 
-void mainwindow::setName(const QString &from, const QString &name) {
+void MainWindow::setName(const QString &from, const QString &name) {
     int ind = (int) otherSockets.indexOf(from);
     if (ind == -1) {
         return;

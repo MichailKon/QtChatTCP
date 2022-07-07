@@ -2,15 +2,18 @@
 #define SERVER_MAINWINDOW_H
 
 #include <QWidget>
-#include <QtNetwork/QTcpServer>
-#include <QtNetwork/QTcpSocket>
-#include <QShortcut>
+
+class QShortcut;
+
+class QTcpServer;
+
+class QTcpSocket;
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class mainwindow; }
+namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
-class mainwindow : public QWidget {
+class MainWindow : public QWidget {
 Q_OBJECT
 
     enum SHOW_MESSAGE_TYPES {
@@ -20,13 +23,13 @@ Q_OBJECT
     };
 
 public:
-    explicit mainwindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
 
-    ~mainwindow() override;
+    ~MainWindow() override;
 
 signals:
 
-    void newMessage(QString &msg, mainwindow::SHOW_MESSAGE_TYPES from);
+    void newMessage(QString &msg, MainWindow::SHOW_MESSAGE_TYPES from);
 
     void newData(QTcpSocket *socket, const QJsonDocument &doc);
 
@@ -40,20 +43,17 @@ private slots:
 
     void appendToSockets(QTcpSocket *socket);
 
-    void showMessage(QString msg, mainwindow::SHOW_MESSAGE_TYPES from);
-
-    void sendMessageButtonClicked();
+    void showMessage(QString msg, MainWindow::SHOW_MESSAGE_TYPES from);
 
     void handleData(QTcpSocket *socket, const QJsonDocument &doc);
 
 private:
-    Ui::mainwindow *ui;
+    Ui::MainWindow *ui;
 
     QTcpServer *server;
     QMap<int, QTcpSocket *> desc2con;
     QMap<QTcpSocket *, int> con2desc;
     QMap<QTcpSocket *, QString> con2name;
-    QShortcut *keyEnter;
 
     const QString allChat = "Whole chat";
     qint32 nextBlock = 0;

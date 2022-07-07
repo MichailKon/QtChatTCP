@@ -1,9 +1,9 @@
 #include <QApplication>
-#include "mainwindow.h"
+#include "../headers/MainWindow.h"
 
 int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
-    auto *window = new mainwindow();
+    auto *window = new MainWindow();
     window->show();
     return QApplication::exec();
 }

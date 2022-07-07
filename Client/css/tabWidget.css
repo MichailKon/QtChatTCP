@@ -1,0 +1,20 @@
+QTabBar::tab:!selected:hover {
+    background: #999;
+}
+
+QTabBar::tab:selected {
+    background: white;
+}
+
+QTabBar::tab:!selected {
+    background: silver;
+}
+
+QTabWidget::pane {
+    border: 1px solid black;
+    background: white;
+}
+
+QTabBar::tab {
+    font-weight: bold;
+}

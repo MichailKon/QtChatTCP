@@ -27,3 +27,4 @@ following fields:
 2. from (for messages)
 3. to (for messages)
 4. descriptor (for connect/disconnect/sending descriptor). This is a list of descriptors
+5. name (for first login)

@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 project(Client)
 
+set(CMAKE_AUTOUIC_SEARCH_PATHS uis)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
-
+set(AUTOGEN_BUILD_DIR src)
 
 find_package(Qt6 COMPONENTS
         Core
@@ -14,13 +15,24 @@ find_package(Qt6 COMPONENTS
         Network
         REQUIRED)
 
-add_executable(Client main.cpp mainwindow.cpp mainwindow.h mainwindow.ui ../TransferProtocol.cpp ../TransferProtocol.h choosename.cpp choosename.h choosename.ui)
+file(COPY css DESTINATION .)
+
+include_directories(headers uis ..)
+
+set(SOURCES ${SOURCES} src/ChooseName.cpp src/MainWindow.cpp src/VerticalTabBar.cpp src/VerticalTabWidget.cpp)
+set(HEADERS ${HEADERS} headers/ChooseName.h headers/MainWindow.h headers/VerticalTabBar.h headers/VerticalTabWidget.h)
+set(UIS ${UIS} uis/ChooseName.ui uis/MainWindow.ui)
+
+add_executable(Client src/main.cpp ${SOURCES} ${HEADERS} ${UIS} ../TransferProtocol.cpp ../TransferProtocol.h)
+
 target_link_libraries(Client
         Qt::Core
         Qt::Gui
         Qt::Widgets
         Qt::Network
         )
+
+target_include_directories(Client PRIVATE headers uis ..)
 
 if (WIN32)
     set(DEBUG_SUFFIX)

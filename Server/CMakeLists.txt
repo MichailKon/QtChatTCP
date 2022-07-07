@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.22)
 project(Server)
 
+set(CMAKE_AUTOUIC_SEARCH_PATHS uis)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+set(AUTOGEN_BUILD_DIR src)
 
 find_package(Qt6 COMPONENTS
         Core
@@ -13,7 +15,10 @@ find_package(Qt6 COMPONENTS
         Network
         REQUIRED)
 
-add_executable(Server main.cpp mainwindow.cpp mainwindow.h mainwindow.ui ../TransferProtocol.cpp ../TransferProtocol.h)
+include_directories(headers uis ..)
+
+
+add_executable(Server src/main.cpp src/MainWindow.cpp headers/MainWindow.h uis/MainWindow.ui ../TransferProtocol.cpp ../TransferProtocol.h)
 target_link_libraries(Server
         Qt::Core
         Qt::Gui

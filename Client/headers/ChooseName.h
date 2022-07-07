@@ -9,16 +9,16 @@
 
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class chooseName; }
+namespace Ui { class ChooseName; }
 QT_END_NAMESPACE
 
-class chooseName : public QDialog {
+class ChooseName : public QDialog {
 Q_OBJECT
 
 public:
-    explicit chooseName(QWidget *parent = nullptr);
+    explicit ChooseName(QWidget *parent = nullptr);
 
-    ~chooseName() override;
+    ~ChooseName() override;
 
 signals:
 
@@ -29,7 +29,7 @@ private slots:
     void close();
 
 private:
-    Ui::chooseName *ui;
+    Ui::ChooseName *ui;
 };
 
 

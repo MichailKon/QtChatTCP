@@ -2,18 +2,21 @@
 #define CLIENT_MAINWINDOW_H
 
 #include <QWidget>
-#include <QtNetwork/QTcpSocket>
 
 class QTextBrowser;
 
 class QShortcut;
 
+class QTcpSocket;
+
+class VerticalTabWidget;
+
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class mainwindow; }
+namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
-class mainwindow : public QWidget {
+class MainWindow : public QWidget {
 Q_OBJECT
 
     enum SHOW_MESSAGE_TYPES {
@@ -23,9 +26,9 @@ Q_OBJECT
     };
 
 public:
-    explicit mainwindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
 
-    ~mainwindow() override;
+    ~MainWindow() override;
 
 signals:
 
@@ -39,7 +42,7 @@ private slots:
 
     void discardSocket();
 
-    void showMessage(QString msg, mainwindow::SHOW_MESSAGE_TYPES from, int ind);
+    void showMessage(QString msg, MainWindow::SHOW_MESSAGE_TYPES from, int ind);
 
     void sendMessageButtonClicked();
 
@@ -48,12 +51,13 @@ private slots:
     void gotName(const QString &name);
 
 private:
-    Ui::mainwindow *ui;
+    Ui::MainWindow *ui;
 
     QTcpSocket *socket;
     QVector<QString> otherSockets;
     QVector<QTextBrowser *> textBrowsers;
     QShortcut *keyEnter;
+    QShortcut *keyCtrlTab;
     QMap<QString, QString> otherNames;
     qint32 nextBlock = 0;
     const QString allChat = "All";
