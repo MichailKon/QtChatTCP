@@ -2,14 +2,14 @@
 // Created by Михаил on 06.07.2022.
 //
 
-#ifndef CLIENT_CHOOSENAME_H
-#define CLIENT_CHOOSENAME_H
+#ifndef CLIENT_CHOOSEADDRESSPORT_H
+#define CLIENT_CHOOSEADDRESSPORT_H
 
 #include <QDialog>
 
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class ChooseName; }
+namespace Ui { class ChooseAddressPort; }
 QT_END_NAMESPACE
 
 class ChooseName : public QDialog {
@@ -20,17 +20,11 @@ public:
 
     ~ChooseName() override;
 
-signals:
-
-    void closed(const QString &name);
-
-private slots:
-
-    void close();
+    static QStringList getAddressPort(QWidget *parent, bool *ok = nullptr);
 
 private:
-    Ui::ChooseName *ui;
+    Ui::ChooseAddressPort *ui;
 };
 
 
-#endif //CLIENT_CHOOSENAME_H
+#endif //CLIENT_CHOOSEADDRESSPORT_H

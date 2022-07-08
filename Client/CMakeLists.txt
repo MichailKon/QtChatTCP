@@ -17,13 +17,13 @@ find_package(Qt6 COMPONENTS
 
 file(COPY css DESTINATION .)
 
-include_directories(headers uis ..)
+include_directories(headers uis ../UsefulThings/headers ../UsefulThings/src ../)
 
-set(SOURCES ${SOURCES} src/ChooseName.cpp src/MainWindow.cpp src/VerticalTabBar.cpp src/VerticalTabWidget.cpp)
-set(HEADERS ${HEADERS} headers/ChooseName.h headers/MainWindow.h headers/VerticalTabBar.h headers/VerticalTabWidget.h)
-set(UIS ${UIS} uis/ChooseName.ui uis/MainWindow.ui)
+set(SOURCES ${SOURCES} src/ChooseAddressPort.cpp src/MainWindow.cpp src/VerticalTabBar.cpp src/VerticalTabWidget.cpp src/ClientConnection.cpp ../TransferProtocol.cpp)
+set(HEADERS ${HEADERS} headers/ChooseAddressPort.h headers/MainWindow.h headers/VerticalTabBar.h headers/VerticalTabWidget.h headers/ClientConnection.h ../TransferProtocol.h)
+set(UIS ${UIS} uis/ChooseAddressPort.ui uis/MainWindow.ui)
 
-add_executable(Client src/main.cpp ${SOURCES} ${HEADERS} ${UIS} ../TransferProtocol.cpp ../TransferProtocol.h)
+add_executable(Client src/main.cpp ${SOURCES} ${HEADERS} ${UIS})
 
 target_link_libraries(Client
         Qt::Core

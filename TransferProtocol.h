@@ -1,7 +1,6 @@
 #ifndef TRANSFER_PROTOCOL_H
 #define TRANSFER_PROTOCOL_H
 
-#include <QtNetwork/QTcpSocket>
 #include <QString>
 #include <QJsonArray>
 
@@ -10,28 +9,22 @@ namespace TransferProtocol {
     const QString ALL = "AllChat";
 
     enum DATA_TYPES {
+        LoggedIn,
         NewMessage,
         NewUsers,
         DelUsers,
-        YourSocketDescriptor,
         NewUserName
     };
 
-    enum VERSIONS {
-        TP_1_0_0
-    };
+    QJsonObject sendMessage(const QString &msg, const QVariant &from, const QVariant &to);
 
-    void sendMessage(QTcpSocket *socket, const QString &msg, const QVariant &from, const QVariant &to);
+    QJsonObject sendNewGuyInfo(const QJsonArray &names);
 
-    void sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc, const QJsonArray &names = {});
+    QJsonObject sendDeadGuyInfo(const QJsonArray &names);
 
-    void sendDeadGuyInfo(QTcpSocket *socket, const QJsonArray &desc);
+    QJsonObject sendUserName(const QString &newName);
 
-    void sendSocketDescriptor(QTcpSocket *socket);
-
-    void sendUserName(QTcpSocket *socket, const QVariant &from, const QString &newName);
-
-    void sendWithHeader(QTcpSocket *socket, const QJsonObject &obj);
+    QJsonObject sendLoggedIn(const bool &logged, const QString &reason);
 }
 
 #endif

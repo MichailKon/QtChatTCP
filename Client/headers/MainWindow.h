@@ -2,6 +2,7 @@
 #define CLIENT_MAINWINDOW_H
 
 #include <QWidget>
+#include <QAbstractSocket>
 
 class QTextBrowser;
 
@@ -11,6 +12,8 @@ class QTcpSocket;
 
 class VerticalTabWidget;
 
+class ClientConnection;
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -19,7 +22,7 @@ QT_END_NAMESPACE
 class MainWindow : public QWidget {
 Q_OBJECT
 
-    enum SHOW_MESSAGE_TYPES {
+    enum SHOW_MESSAGE_TYPE {
         FromServerMessage,
         SentMessage,
         NormalMessage
@@ -30,42 +33,50 @@ public:
 
     ~MainWindow() override;
 
-signals:
-
-    void newMessage(QString msg, SHOW_MESSAGE_TYPES type, int ind);
-
-    void newData(const QJsonDocument &doc);
-
 private slots:
 
-    void readSocket();
+    void attemptConnection();
 
-    void discardSocket();
+    void connectedToServer();
 
-    void showMessage(QString msg, MainWindow::SHOW_MESSAGE_TYPES from, int ind);
+    void attemptLogin(const QString &name);
 
-    void sendMessageButtonClicked();
+    void loggedIn();
 
-    void handleData(const QJsonDocument &doc);
+    void loginFailed(const QString &reason);
 
-    void gotName(const QString &name);
+    void messageReceived(const QString &msg, const QString &from, const QString &to);
+
+    void sendMessage();
+
+    void disconnectedFromServer();
+
+    void newUsers(const QJsonArray &names);
+
+    void delUsers(const QJsonArray &names);
+
+    void error(QAbstractSocket::SocketError socketError);
+
+    void showMessage(const QString &msg, MainWindow::SHOW_MESSAGE_TYPE messageType, int ind);
+
+signals:
+
+    void newMessage(const QString &msg, MainWindow::SHOW_MESSAGE_TYPE messageType, int ind);
 
 private:
     Ui::MainWindow *ui;
 
-    QTcpSocket *socket;
     QVector<QString> otherSockets;
     QVector<QTextBrowser *> textBrowsers;
-    QShortcut *keyEnter;
     QShortcut *keyCtrlTab;
-    QMap<QString, QString> otherNames;
-    qint32 nextBlock = 0;
     const QString allChat = "All";
     const QString serverMessage = "Server";
 
+    ClientConnection *connection;
+
     void createTabWidget(const QString &title);
 
-    void setName(const QString &from, const QString &name);
+    void prepareTabWidget();
 };
 
 

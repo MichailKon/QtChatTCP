@@ -1,228 +1,73 @@
 #include "MainWindow.h"
 #include "ui_mainwindow.h"
-#include "ChooseName.h"
+#include "ChooseAddressPort.h"
 #include "VerticalTabBar.h"
 #include "TransferProtocol.h"
 #include "VerticalTabWidget.h"
+#include "ClientConnection.h"
 #include <QMessageBox>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QShortcut>
 #include <QTextBrowser>
+#include <QConstOverload>
+#include <QtNetwork/QAbstractSocket>
 #include <QFile>
 #include <QtNetwork/QTcpSocket>
+#include <QInputDialog>
 
 
 MainWindow::MainWindow(QWidget *parent) :
-        QWidget(parent), ui(new Ui::MainWindow) {
-    auto diag = new ChooseName(this);
-    connect(diag, &ChooseName::closed, this, &MainWindow::gotName);
-    diag->show();
-
+        QWidget(parent), ui(new Ui::MainWindow), connection(new ClientConnection(this)) {
     ui->setupUi(this);
 
     QFile file("css/tabWidget.css");
     file.open(QFile::ReadOnly);
     QString styleSheet = QLatin1String(file.readAll());
     setStyleSheet(styleSheet);
+    prepareTabWidget();
 
-    otherSockets.push_back(TransferProtocol::ALL);
-    createTabWidget(TransferProtocol::ALL);
-    otherSockets.push_back(TransferProtocol::SERVER);
-    createTabWidget(TransferProtocol::SERVER);
-
-    nextBlock = 0;
-
-    socket = new QTcpSocket(this);
-
-    socket->connectToHost(QHostAddress::LocalHost, 8080);
-    if (socket->waitForConnected()) {
-        ui->statusBar->showMessage("Connected to server");
-    } else {
-        QMessageBox::critical(this, "Client", QString("The following error occurred: %1.").arg(socket->errorString()));
-        exit(EXIT_FAILURE);
-    }
-
-    connect(this, &MainWindow::newData, this, &MainWindow::handleData);
-    connect(this, &MainWindow::newMessage, this, &MainWindow::showMessage);
-    connect(socket, &QTcpSocket::readyRead, this, &MainWindow::readSocket);
-    connect(socket, &QTcpSocket::disconnected, this, &MainWindow::discardSocket);
-    connect(ui->pushButton, &QPushButton::clicked, this, &MainWindow::sendMessageButtonClicked);
-    keyEnter = new QShortcut(this);
-    keyEnter->setKey(Qt::Key_Return);
-    connect(keyEnter, &QShortcut::activated, ui->pushButton, &QPushButton::click);
     keyCtrlTab = new QShortcut(this);
     keyCtrlTab->setKey(Qt::Key_Control | Qt::Key_T);
     connect(keyCtrlTab, &QShortcut::activated, ui->tabWidget, &QTabWidget::nextInFocusChain);
+
+    connect(connection, &ClientConnection::connected, this, &MainWindow::connectedToServer);
+    connect(connection, &ClientConnection::loggedIn, this, &MainWindow::loggedIn);
+    connect(connection, &ClientConnection::loginError, this, &MainWindow::loginFailed);
+    connect(connection, &ClientConnection::newMessage, this, &MainWindow::messageReceived);
+    connect(connection, &ClientConnection::disconnected, this, &MainWindow::disconnectedFromServer);
+    connect(connection, &ClientConnection::error, this, &MainWindow::error);
+    connect(connection, &ClientConnection::newUsers, this, &MainWindow::newUsers);
+    connect(connection, &ClientConnection::delUsers, this, &MainWindow::delUsers);
+
+    connect(ui->pushButton_connect, &QPushButton::clicked, this, &MainWindow::attemptConnection);
+
+    connect(ui->pushButton_sendMessage, &QPushButton::clicked, this, &MainWindow::sendMessage);
+    connect(ui->lineEdit, &QLineEdit::returnPressed, this, &MainWindow::sendMessage);
+    ui->pushButton_sendMessage->hide();
+
+    connect(this, &MainWindow::newMessage, this, &MainWindow::showMessage);
+
+    QSizePolicy sp_retain = ui->pushButton_sendMessage->sizePolicy();
+    sp_retain.setRetainSizeWhenHidden(true);
+    ui->pushButton_sendMessage->setSizePolicy(sp_retain);
+    sp_retain = ui->pushButton_connect->sizePolicy();
+    sp_retain.setRetainSizeWhenHidden(true);
+    ui->pushButton_connect->setSizePolicy(sp_retain);
+
+    ui->pushButton_sendMessage->hide();
+    ui->lineEdit->setDisabled(true);
+    ui->tabWidget->setDisabled(true);
+    ui->statusBar->showMessage("Ожидание подключения");
 }
 
 MainWindow::~MainWindow() {
-    if (socket->isOpen()) {
-        socket->close();
-    }
     delete ui;
-}
-
-void MainWindow::showMessage(QString msg, SHOW_MESSAGE_TYPES from, int ind) {
-    if (ind < 0 || ind >= textBrowsers.size()) {
-        return;
-    }
-    if (from == FromServerMessage) {
-        msg = tr("<span style=\"color:RED\">%1</span>").arg(msg);
-    } else if (from == SentMessage) {
-        msg = tr("<span style=\"color:BLUE\">%1</span>").arg(msg);
-    }
-    textBrowsers[ind]->append(msg);
-}
-
-void MainWindow::sendMessageButtonClicked() {
-    if (!socket) return;
-    if (!socket->isOpen()) return;
-    if (ui->lineEdit->text().isEmpty()) {
-        return;
-    }
-    QString msg = ui->lineEdit->text();
-    ui->lineEdit->clear();
-
-    int ind = ui->tabWidget->currentIndex();
-    QString curTabText = ui->tabWidget->tabText(ind);
-    if (curTabText == allChat) {
-        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
-        TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), TransferProtocol::ALL);
-    } else if (curTabText == serverMessage) {
-        showMessage(tr("INFO :: You can't send message to server"), FromServerMessage, ind);
-    } else {
-        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
-        TransferProtocol::sendMessage(socket, msg, (int) socket->socketDescriptor(), otherSockets[ind]);
-    }
-}
-
-void MainWindow::discardSocket() {
-    socket->deleteLater();
-    socket = nullptr;
-    ui->statusBar->showMessage("Disconnected");
-}
-
-void MainWindow::readSocket() {
-    QByteArray buffer;
-
-    QDataStream in(socket);
-    in.setVersion(QDataStream::Qt_6_3);
-    nextBlock = 0;
-    forever {
-        if (nextBlock == 0) {
-            if (socket->bytesAvailable() < sizeof(qint32)) {
-                break;
-            }
-            in >> nextBlock;
-        }
-        if (socket->bytesAvailable() < nextBlock) {
-            break;
-        }
-        in >> buffer;
-
-        QJsonDocument doc = QJsonDocument::fromJson(buffer);
-        emit newData(doc);
-
-        buffer.clear();
-        nextBlock = 0;
-    }
-}
-
-void MainWindow::handleData(const QJsonDocument &doc) {
-    if (doc.isNull() || !doc.isObject()) {
-        return;
-    }
-    QJsonObject data = doc.object();
-    if (!data.contains("type")) {
-        return;
-    }
-
-    TransferProtocol::DATA_TYPES type = TransferProtocol::DATA_TYPES(data["type"].toInt());
-    if (type == TransferProtocol::NewMessage) {
-        if (!data.contains("from") || !data.contains("msg")) {
-            return;
-        }
-        QString from = doc["from"].toString();
-        QString message = QString("%1 :: %2").arg(otherNames.value(from, from), doc["msg"].toString());
-        int ind = (int) otherSockets.indexOf(from);
-        if (ind == -1) {
-            return;
-        }
-        if (data.value("to").toString() == TransferProtocol::ALL) {
-            ind = (int) otherSockets.indexOf(TransferProtocol::ALL);
-            if (ind == -1) {
-                QMessageBox::critical(this, "ERROR", "Can't find chat with other people");
-                return;
-            }
-        }
-        emit newMessage(message,
-                        doc["from"].toString() == TransferProtocol::SERVER ? FromServerMessage : NormalMessage,
-                        ind);
-    } else if (type == TransferProtocol::NewUsers) {
-        if (!data.contains("descriptor")) {
-            return;
-        }
-        QJsonArray desc = doc["descriptor"].toArray();
-        QJsonArray names;
-        if (data.contains("name")) {
-            names = data["name"].toArray();
-        }
-        if (!names.empty() && desc.size() != names.size()) {
-            close();
-        }
-        QStringList result;
-        for (int i = 0; i < desc.size(); i++) {
-            QString de = desc[i].toString();
-            otherSockets.push_back(de);
-            createTabWidget(de);
-            if (!names.empty()) {
-                QString name = names[i].toString();
-                setName(de, name);
-                otherNames[de] = name;
-                result << name;
-            } else {
-                result << de;
-            }
-        }
-
-        showMessage(tr("%1 connected").arg(result.join(" ")), FromServerMessage,
-                    (int) otherSockets.indexOf(TransferProtocol::SERVER));
-    } else if (type == TransferProtocol::DelUsers) {
-        if (!data.contains("descriptor")) {
-            return;
-        }
-        QJsonArray desc = doc["descriptor"].toArray();
-        QStringList names;
-        for (auto &&i: desc) {
-            QString de = i.toString();
-            int ind = (int) otherSockets.indexOf(de);
-            ui->tabWidget->removeTab(ind);
-            otherSockets.remove(ind);
-            delete textBrowsers[ind];
-            textBrowsers.remove(ind);
-            otherNames.remove(de);
-            names << otherNames.value(de, de);
-        }
-
-        showMessage(tr("%1 disconnected").arg(names.join(" ")), FromServerMessage,
-                    (int) otherSockets.indexOf(TransferProtocol::SERVER));
-    } else if (type == TransferProtocol::YourSocketDescriptor) {
-        if (!data.contains("descriptor")) {
-            return;
-        }
-        setWindowTitle(tr("Client: %1").arg(doc["descriptor"].toString()));
-    } else if (type == TransferProtocol::NewUserName) {
-        if (!data.contains("from") || !data.contains("name")) {
-            return;
-        }
-        QString from = data["from"].toString(), name = data["name"].toString();
-        otherNames[from] = name;
-        setName(from, name);
-
-        showMessage(tr("%1 changed name to %2").arg(from, name), FromServerMessage,
-                    (int) otherSockets.indexOf(TransferProtocol::SERVER));
+    connection->deleteLater();
+    keyCtrlTab->deleteLater();
+    for (auto &i: textBrowsers) {
+        i->deleteLater();
     }
 }
 
@@ -236,15 +81,211 @@ void MainWindow::createTabWidget(const QString &title) {
     textBrowsers.push_back(browser);
 }
 
-void MainWindow::gotName(const QString &name) {
-    setWindowTitle(tr("Client: %1").arg(name));
-    TransferProtocol::sendUserName(socket, "", name);
+void MainWindow::attemptConnection() {
+    if (connection->isLoggedIn()) {
+        int res = QMessageBox::question(this, tr("Disconnect"), "Отключиться?",
+                                        QMessageBox::Yes, QMessageBox::No);
+        if (res == QMessageBox::Yes) {
+            connection->disconnect();
+        }
+        return;
+    }
+    const QStringList connectionData = ChooseName::getAddressPort(this);
+    if (connectionData.size() != 2) {
+        return;
+    }
+    auto [address, port] = std::tie(connectionData[0], connectionData[1]);
+    if (address.isEmpty() || port.isEmpty()) {
+        return;
+    }
+    ui->pushButton_connect->setText("Отключиться");
+    ui->statusBar->showMessage("Попытка подключения");
+    connection->connectToServer(QHostAddress(address), 8080);
 }
 
-void MainWindow::setName(const QString &from, const QString &name) {
+void MainWindow::connectedToServer() {
+    const QString name = QInputDialog::getText(this, tr("Choose name"), tr("Логин"));
+    if (name.isEmpty()) {
+        QMessageBox::critical(this, "ERROR", "Необходимо ввести имя");
+        return connection->disconnect();
+    }
+    ui->statusBar->showMessage("Попытка логина");
+    attemptLogin(name);
+}
+
+void MainWindow::attemptLogin(const QString &userName) {
+    connection->login(userName);
+}
+
+void MainWindow::loggedIn() {
+    ui->pushButton_sendMessage->show();
+    ui->lineEdit->setEnabled(true);
+    ui->tabWidget->setEnabled(true);
+    ui->statusBar->showMessage("Подключено");
+}
+
+void MainWindow::loginFailed(const QString &reason) {
+    QMessageBox::critical(this, tr("Error"), reason);
+    connectedToServer();
+}
+
+void MainWindow::messageReceived(const QString &msg, const QString &from, const QString &to) {
     int ind = (int) otherSockets.indexOf(from);
+    if (to == TransferProtocol::ALL) {
+        ind = (int) otherSockets.indexOf(TransferProtocol::ALL);
+        if (ind == -1) {
+            QMessageBox::critical(this, "ERROR", "Can't find chat with other people");
+            return;
+        }
+    }
     if (ind == -1) {
         return;
     }
-    ui->tabWidget->setTabText(ind, name);
+    emit newMessage(tr("%1 :: %2").arg(from, msg),
+                    from == TransferProtocol::SERVER ? FromServerMessage : NormalMessage,
+                    ind);
+}
+
+void MainWindow::showMessage(const QString &msg, SHOW_MESSAGE_TYPE messageType, int ind) {
+    if (ind < 0 || ind >= textBrowsers.size()) {
+        return;
+    }
+    QString message = msg;
+    if (messageType == FromServerMessage) {
+        message = tr("<span style=\"color:RED\">%1</span>").arg(msg);
+    } else if (messageType == SentMessage) {
+        message = tr("<span style=\"color:BLUE\">%1</span>").arg(msg);
+    }
+    textBrowsers[ind]->append(message);
+}
+
+void MainWindow::sendMessage() {
+    QString msg = ui->lineEdit->text();
+    ui->lineEdit->clear();
+    int ind = ui->tabWidget->currentIndex();
+    QString curTabText = ui->tabWidget->tabText(ind);
+    if (curTabText == allChat) {
+        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
+        connection->sendMessage(msg, TransferProtocol::ALL);
+    } else if (curTabText == serverMessage) {
+        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
+        connection->sendMessage(msg, TransferProtocol::SERVER);
+    } else {
+        showMessage(tr("YOU: %1").arg(msg), SentMessage, ind);
+        connection->sendMessage(msg, curTabText);
+    }
+}
+
+void MainWindow::disconnectedFromServer() {
+    ui->pushButton_sendMessage->hide();
+    ui->lineEdit->setDisabled(true);
+    ui->tabWidget->setDisabled(true);
+    ui->pushButton_connect->setText("Подключиться");
+    ui->statusBar->showMessage("Ожидание подключения");
+    prepareTabWidget();
+}
+
+void MainWindow::newUsers(const QJsonArray &names) {
+    QStringList convNames;
+    for (auto &&name: names) {
+        convNames << name.toString();
+        createTabWidget(name.toString());
+        otherSockets.push_back(name.toString());
+    }
+    showMessage(tr("INFO :: %1 connected").arg(convNames.join(" ")), FromServerMessage,
+                (int) otherSockets.indexOf(TransferProtocol::SERVER));
+}
+
+void MainWindow::delUsers(const QJsonArray &names) {
+    QStringList convNames;
+    for (auto &&name: names) {
+        QString n = name.toString();
+        int ind = (int) otherSockets.indexOf(n);
+        if (ind == -1) {
+            continue;
+        }
+        ui->tabWidget->removeTab(ind);
+        delete textBrowsers[ind];
+        textBrowsers.remove(ind);
+        otherSockets.remove(ind);
+        convNames << n;
+    }
+    showMessage(tr("INFO :: %1 disconnected").arg(convNames.join(" ")), FromServerMessage,
+                (int) otherSockets.indexOf(TransferProtocol::SERVER));
+}
+
+void MainWindow::error(QAbstractSocket::SocketError socketError) {
+    switch (socketError) {
+        case QAbstractSocket::RemoteHostClosedError:
+        case QAbstractSocket::ProxyConnectionClosedError:
+            QMessageBox::warning(this, tr("Disconnected"), tr("The host terminated the connection"));
+            return; // handled by disconnectedFromServer
+        case QAbstractSocket::ConnectionRefusedError:
+            QMessageBox::critical(this, tr("Error"), tr("The host refused the connection"));
+            break;
+        case QAbstractSocket::ProxyConnectionRefusedError:
+            QMessageBox::critical(this, tr("Error"), tr("The proxy refused the connection"));
+            break;
+        case QAbstractSocket::ProxyNotFoundError:
+            QMessageBox::critical(this, tr("Error"), tr("Could not find the proxy"));
+            break;
+        case QAbstractSocket::HostNotFoundError:
+            QMessageBox::critical(this, tr("Error"), tr("Could not find the server"));
+            break;
+        case QAbstractSocket::SocketAccessError:
+            QMessageBox::critical(this, tr("Error"), tr("You don't have permissions to execute this operation"));
+            break;
+        case QAbstractSocket::SocketResourceError:
+            QMessageBox::critical(this, tr("Error"), tr("Too many connections opened"));
+            break;
+        case QAbstractSocket::SocketTimeoutError:
+            QMessageBox::warning(this, tr("Error"), tr("Operation timed out"));
+            return;
+        case QAbstractSocket::ProxyConnectionTimeoutError:
+            QMessageBox::critical(this, tr("Error"), tr("Proxy timed out"));
+            break;
+        case QAbstractSocket::NetworkError:
+            QMessageBox::critical(this, tr("Error"), tr("Unable to reach the network"));
+            break;
+        case QAbstractSocket::UnknownSocketError:
+            QMessageBox::critical(this, tr("Error"), tr("An unknown error occurred"));
+            break;
+        case QAbstractSocket::UnsupportedSocketOperationError:
+            QMessageBox::critical(this, tr("Error"), tr("Operation not supported"));
+            break;
+        case QAbstractSocket::ProxyAuthenticationRequiredError:
+            QMessageBox::critical(this, tr("Error"), tr("Your proxy requires authentication"));
+            break;
+        case QAbstractSocket::ProxyProtocolError:
+            QMessageBox::critical(this, tr("Error"), tr("Proxy communication failed"));
+            break;
+        case QAbstractSocket::TemporaryError:
+        case QAbstractSocket::OperationError:
+            QMessageBox::warning(this, tr("Error"), tr("Operation failed, please try again"));
+            return;
+        default:
+            Q_UNREACHABLE();
+    }
+    ui->pushButton_connect->setText("Подключиться");
+    ui->pushButton_sendMessage->hide();
+    ui->lineEdit->setDisabled(true);
+    ui->tabWidget->setDisabled(true);
+    ui->statusBar->showMessage("Ожидание подключения");
+}
+
+void MainWindow::prepareTabWidget() {
+    otherSockets.clear();
+    for (auto &i : textBrowsers) {
+        delete i;
+    }
+    textBrowsers.clear();
+    ui->tabWidget->clear();
+//    while (ui->tabWidget->count()) {
+//        ui->tabWidget->removeTab(0);
+//    }
+
+    otherSockets.push_back(TransferProtocol::ALL);
+    createTabWidget(TransferProtocol::ALL);
+    otherSockets.push_back(TransferProtocol::SERVER);
+    createTabWidget(TransferProtocol::SERVER);
 }

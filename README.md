@@ -20,11 +20,10 @@ Features
 
 Protocol
 ---
-The protocol I've designed is quite simple. It sends 4 bytes (lets call them C) and JSON with size of C bytes and
-following fields:
+The protocol is just a JSON document with following fields:
 
 1. type. This is an enum element
 2. from (for messages)
 3. to (for messages)
-4. descriptor (for connect/disconnect/sending descriptor). This is a list of descriptors
+4. names (for connect/disconnect)
 5. name (for first login)

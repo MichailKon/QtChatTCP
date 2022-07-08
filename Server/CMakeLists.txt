@@ -15,10 +15,13 @@ find_package(Qt6 COMPONENTS
         Network
         REQUIRED)
 
-include_directories(headers uis ..)
+include_directories(headers ..)
 
+set(SOURCES ${SOURCES} src/ChatTcpServer.cpp src/ServerWorker.cpp ../TransferProtocol.cpp)
+set(HEADERS ${HEADERS} headers/ChatTcpServer.h headers/ServerWorker.h ../TransferProtocol.h)
+set(UIS ${UIS} src/MainWindow.cpp headers/MainWindow.h uis/MainWindow.ui)
 
-add_executable(Server src/main.cpp src/MainWindow.cpp headers/MainWindow.h uis/MainWindow.ui ../TransferProtocol.cpp ../TransferProtocol.h)
+add_executable(Server src/main.cpp ${SOURCES} ${HEADERS} ${UIS})
 target_link_libraries(Server
         Qt::Core
         Qt::Gui

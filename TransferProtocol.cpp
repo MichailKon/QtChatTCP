@@ -1,65 +1,47 @@
 #include "TransferProtocol.h"
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 
-void TransferProtocol::sendMessage(QTcpSocket *socket, const QString &msg, const QVariant &from, const QVariant &to) {
+QJsonObject TransferProtocol::sendMessage(const QString &msg, const QVariant &from, const QVariant &to) {
     QJsonObject recordObject;
+    recordObject.insert("type", TransferProtocol::NewMessage);
     recordObject.insert("msg", msg);
     recordObject.insert("from", from.toString());
-    recordObject.insert("type", TransferProtocol::NewMessage);
     recordObject.insert("to", to.toString());
 
-    TransferProtocol::sendWithHeader(socket, recordObject);
+    return recordObject;
 }
 
-void TransferProtocol::sendNewGuyInfo(QTcpSocket *socket, const QJsonArray &desc, const QJsonArray &names) {
+QJsonObject TransferProtocol::sendNewGuyInfo(const QJsonArray &names) {
     QJsonObject recordObject;
-    recordObject.insert("descriptor", desc);
-    if (!names.isEmpty()) {
-        recordObject.insert("name", names);
-    }
     recordObject.insert("type", TransferProtocol::NewUsers);
+    recordObject.insert("names", names);
 
-    TransferProtocol::sendWithHeader(socket, recordObject);
+    return recordObject;
 }
 
-void TransferProtocol::sendDeadGuyInfo(QTcpSocket *socket, const QJsonArray &desc) {
+QJsonObject TransferProtocol::sendDeadGuyInfo(const QJsonArray &names) {
     QJsonObject recordObject;
-    recordObject.insert("descriptor", desc);
     recordObject.insert("type", TransferProtocol::DelUsers);
+    recordObject.insert("names", names);
 
-    TransferProtocol::sendWithHeader(socket, recordObject);
+    return recordObject;
 }
 
-void TransferProtocol::sendSocketDescriptor(QTcpSocket *socket) {
-    QJsonObject recordObject;
-    recordObject.insert("descriptor", QString::number(socket->socketDescriptor()));
-    recordObject.insert("type", TransferProtocol::YourSocketDescriptor);
-
-    TransferProtocol::sendWithHeader(socket, recordObject);
-}
-
-void TransferProtocol::sendUserName(QTcpSocket *socket, const QVariant &from, const QString &newName) {
+QJsonObject TransferProtocol::sendUserName(const QString &newName) {
     QJsonObject recordObject;
     recordObject.insert("type", TransferProtocol::NewUserName);
-    recordObject.insert("from", from.toString());
     recordObject.insert("name", newName);
 
-    TransferProtocol::sendWithHeader(socket, recordObject);
+    return recordObject;
 }
 
-void TransferProtocol::sendWithHeader(QTcpSocket *socket, const QJsonObject &obj) {
-    if (!socket) return;
-    if (!socket->isOpen()) return;
+QJsonObject TransferProtocol::sendLoggedIn(const bool &logged, const QString &reason) {
+    QJsonObject recordObject;
+    recordObject.insert("type", TransferProtocol::LoggedIn);
+    recordObject.insert("logged", logged);
+    recordObject.insert("reason", reason);
 
-    QByteArray block;
-    QDataStream stream(&block, QIODevice::WriteOnly);
-    stream.setVersion(QDataStream::Qt_6_3);
-    stream << qint32(0) << obj;
-    if (stream.device()->size() > std::numeric_limits<qint32>::max() + sizeof(qint32)) {
-        return;
-    }
-    stream.device()->seek(0);
-    stream << qint32(block.size() - sizeof(qint32));
-    socket->write(block);
+    return recordObject;
 }

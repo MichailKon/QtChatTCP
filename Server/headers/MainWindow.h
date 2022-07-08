@@ -3,11 +3,7 @@
 
 #include <QWidget>
 
-class QShortcut;
-
-class QTcpServer;
-
-class QTcpSocket;
+class ChatTcpServer;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -16,47 +12,26 @@ QT_END_NAMESPACE
 class MainWindow : public QWidget {
 Q_OBJECT
 
-    enum SHOW_MESSAGE_TYPES {
-        InfoMessage,
-        SentMessage,
-        NormalMessage
-    };
-
 public:
     explicit MainWindow(QWidget *parent = nullptr);
 
     ~MainWindow() override;
 
-signals:
-
-    void newMessage(QString &msg, MainWindow::SHOW_MESSAGE_TYPES from);
-
-    void newData(QTcpSocket *socket, const QJsonDocument &doc);
-
 private slots:
 
-    void newConnection();
+    void logMessage(const QString &message);
 
-    void readSocket();
-
-    void discardSocket();
-
-    void appendToSockets(QTcpSocket *socket);
-
-    void showMessage(QString msg, MainWindow::SHOW_MESSAGE_TYPES from);
-
-    void handleData(QTcpSocket *socket, const QJsonDocument &doc);
+    void buttonClicked();
 
 private:
     Ui::MainWindow *ui;
+    ChatTcpServer *server;
 
-    QTcpServer *server;
-    QMap<int, QTcpSocket *> desc2con;
-    QMap<QTcpSocket *, int> con2desc;
-    QMap<QTcpSocket *, QString> con2name;
+    const QString turnOnText = "Включить", turnOffText = "Выключить";
 
-    const QString allChat = "Whole chat";
-    qint32 nextBlock = 0;
+    void turnServerOn();
+
+    void turnServerOff();
 };
 
 
