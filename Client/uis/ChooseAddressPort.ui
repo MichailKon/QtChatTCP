@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>ChooseName</string>
+   <string>ChooseAddressPort</string>
   </property>
   <layout class="QFormLayout" name="formLayout">
    <item row="0" column="0">
@@ -22,7 +22,7 @@
     </widget>
    </item>
    <item row="0" column="1">
-    <widget class="QLineEdit" name="lineEdit_address">
+    <widget class="MyLineEdit" name="lineEdit_address">
      <property name="text">
       <string>127.0.0.1</string>
      </property>
@@ -36,24 +36,71 @@
     </widget>
    </item>
    <item row="1" column="1">
-    <widget class="QLineEdit" name="lineEdit_port">
+    <widget class="MyLineEdit" name="lineEdit_port">
      <property name="text">
       <string>8080</string>
      </property>
     </widget>
    </item>
-   <item row="2" column="0" colspan="2">
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+   <item row="3" column="0">
+    <widget class="MyButton" name="pushButton_cancel">
+     <property name="text">
+      <string>Отмена</string>
      </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     <property name="_bgColor" stdset="0">
+      <string>#777</string>
+     </property>
+     <property name="_textColor" stdset="0">
+      <string>white</string>
      </property>
     </widget>
    </item>
+   <item row="3" column="1">
+    <widget class="MyButton" name="pushButton_accept">
+     <property name="text">
+      <string>ОК</string>
+     </property>
+     <property name="_bgColor" stdset="0">
+      <string>#777</string>
+     </property>
+     <property name="_textColor" stdset="0">
+      <string>white</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0" colspan="2">
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>MyButton</class>
+   <extends>QPushButton</extends>
+   <header>mybutton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>MyLineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>mylineedit.h</header>
+  </customwidget>
+ </customwidgets>
+ <tabstops>
+  <tabstop>lineEdit_address</tabstop>
+  <tabstop>lineEdit_port</tabstop>
+  <tabstop>pushButton_accept</tabstop>
+  <tabstop>pushButton_cancel</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

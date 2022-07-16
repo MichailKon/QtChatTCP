@@ -1,0 +1,78 @@
+/* tabs */
+QTabBar::tab {
+    background-color: gray;
+    border: 2px solid #C4C4C3;
+    border-bottom-color: silver;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    min-width: 8ex;
+    padding: 2px;
+    color: black;
+}
+
+QTabBar::tab:hovered {
+    border-color: #333;
+}
+
+QTabBar::tab:selected {
+    border-color: #9B9B9B;
+    border-bottom-color: silver;
+    border-color: #555;
+}
+
+QTabBar::tab:!selected {
+    margin-top: 2px;
+}
+
+QTabBar::tab:selected {
+    margin-left: -4px;
+    margin-right: -4px;
+    border-bottom: none;
+}
+
+QTabBar::tab:first:selected {
+    margin-left: 0;
+}
+
+QTabBar::tab:last:selected {
+    margin-right: 0;
+}
+
+QTabBar::tab:only-one {
+    margin: 0;
+}
+
+QTabBar::tab {
+    border-bottom: none;
+}
+
+/* tab pane */
+
+QTabWidget::pane {
+    margin-top: -10px;
+    border-top: 2px solid silver;
+    top: 0.5em;
+}
+
+/* tab bar */
+
+QTabWidget::tab-bar {
+    left: 5px;
+    alignment: center;
+}
+
+/* widget inside */
+
+/* mainWidget */
+QWidget#MainWindow {
+    background-color: gray;
+}
+
+/* line edit */
+QLineEdit {
+    border: 2px solid #555;
+    border-radius: 10px;
+    padding: 0 8px;
+    selection-background-color: darkgray;
+    background-color: #777;
+}

@@ -1,10 +1,9 @@
 #include "MainWindow.h"
 #include "ui_mainwindow.h"
 #include "ChooseAddressPort.h"
-#include "VerticalTabBar.h"
 #include "TransferProtocol.h"
-#include "VerticalTabWidget.h"
 #include "ClientConnection.h"
+#include "ChooseName.h"
 #include <QMessageBox>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -15,14 +14,15 @@
 #include <QtNetwork/QAbstractSocket>
 #include <QFile>
 #include <QtNetwork/QTcpSocket>
-#include <QInputDialog>
+#include <QKeyEvent>
 
 
 MainWindow::MainWindow(QWidget *parent) :
         QWidget(parent), ui(new Ui::MainWindow), connection(new ClientConnection(this)) {
     ui->setupUi(this);
+    setObjectName("MainWindow");
 
-    QFile file("css/tabWidget.css");
+    QFile file("qss/tabWidget.qss");
     file.open(QFile::ReadOnly);
     QString styleSheet = QLatin1String(file.readAll());
     setStyleSheet(styleSheet);
@@ -73,6 +73,7 @@ MainWindow::~MainWindow() {
 
 void MainWindow::createTabWidget(const QString &title) {
     auto *tab = new QWidget();
+    tab->setObjectName("messageBox");
     auto *grid = new QGridLayout();
     tab->setLayout(grid);
     auto *browser = new QTextBrowser();
@@ -83,14 +84,28 @@ void MainWindow::createTabWidget(const QString &title) {
 
 void MainWindow::attemptConnection() {
     if (connection->isLoggedIn()) {
-        int res = QMessageBox::question(this, tr("Disconnect"), "Отключиться?",
-                                        QMessageBox::Yes, QMessageBox::No);
-        if (res == QMessageBox::Yes) {
+        QMessageBox msgBox(this);
+        msgBox.setObjectName("MainWindow");
+        msgBox.setText("Отключиться?");
+        msgBox.setWindowTitle(tr("Disconnect"));
+        auto pButtonYes = new MyButton("Да");
+        pButtonYes->set_bgColor("#777");
+        pButtonYes->set_textColor("white");
+        auto pButtonNo = new MyButton("Нет");
+        pButtonNo->set_bgColor("#777");
+        pButtonNo->set_textColor("white");
+        msgBox.addButton(pButtonNo, QMessageBox::NoRole);
+        msgBox.addButton(pButtonYes, QMessageBox::NoRole); // trash but nice order
+        msgBox.exec();
+        if (msgBox.clickedButton() == pButtonYes) {
             connection->disconnect();
         }
+        pButtonYes->deleteLater();
+        pButtonNo->deleteLater();
+        ui->lineEdit->setFocus();
         return;
     }
-    const QStringList connectionData = ChooseName::getAddressPort(this);
+    const QStringList connectionData = ChooseAddressPort::getAddressPort(this);
     if (connectionData.size() != 2) {
         return;
     }
@@ -99,14 +114,18 @@ void MainWindow::attemptConnection() {
         return;
     }
     ui->pushButton_connect->setText("Отключиться");
+    ui->pushButton_connect->setDisabled(true);
     ui->statusBar->showMessage("Попытка подключения");
     connection->connectToServer(QHostAddress(address), 8080);
+    ui->pushButton_connect->setFocus();
 }
 
 void MainWindow::connectedToServer() {
-    const QString name = QInputDialog::getText(this, tr("Choose name"), tr("Логин"));
+    ui->pushButton_connect->setEnabled(true);
+    const QString name = ChooseName::getName(this);
+
     if (name.isEmpty()) {
-        QMessageBox::critical(this, "ERROR", "Необходимо ввести имя");
+        showMessageBox("Error", "Необходимо ввести имя", QMessageBox::Critical);
         return connection->disconnect();
     }
     ui->statusBar->showMessage("Попытка логина");
@@ -115,6 +134,7 @@ void MainWindow::connectedToServer() {
 
 void MainWindow::attemptLogin(const QString &userName) {
     connection->login(userName);
+    setWindowTitle("Client: " + userName);
 }
 
 void MainWindow::loggedIn() {
@@ -122,10 +142,11 @@ void MainWindow::loggedIn() {
     ui->lineEdit->setEnabled(true);
     ui->tabWidget->setEnabled(true);
     ui->statusBar->showMessage("Подключено");
+    ui->lineEdit->setFocus();
 }
 
 void MainWindow::loginFailed(const QString &reason) {
-    QMessageBox::critical(this, tr("Error"), reason);
+    showMessageBox("Error", reason, QMessageBox::Critical);
     connectedToServer();
 }
 
@@ -134,7 +155,7 @@ void MainWindow::messageReceived(const QString &msg, const QString &from, const 
     if (to == TransferProtocol::ALL) {
         ind = (int) otherSockets.indexOf(TransferProtocol::ALL);
         if (ind == -1) {
-            QMessageBox::critical(this, "ERROR", "Can't find chat with other people");
+            showMessageBox("Error", "Нет чата со всеми", QMessageBox::Critical);
             return;
         }
     }
@@ -162,6 +183,9 @@ void MainWindow::showMessage(const QString &msg, SHOW_MESSAGE_TYPE messageType, 
 void MainWindow::sendMessage() {
     QString msg = ui->lineEdit->text();
     ui->lineEdit->clear();
+    if (msg.isEmpty()) {
+        return;
+    }
     int ind = ui->tabWidget->currentIndex();
     QString curTabText = ui->tabWidget->tabText(ind);
     if (curTabText == allChat) {
@@ -183,6 +207,7 @@ void MainWindow::disconnectedFromServer() {
     ui->pushButton_connect->setText("Подключиться");
     ui->statusBar->showMessage("Ожидание подключения");
     prepareTabWidget();
+    setWindowTitle("Client");
 }
 
 void MainWindow::newUsers(const QJsonArray &names) {
@@ -218,50 +243,51 @@ void MainWindow::error(QAbstractSocket::SocketError socketError) {
     switch (socketError) {
         case QAbstractSocket::RemoteHostClosedError:
         case QAbstractSocket::ProxyConnectionClosedError:
-            QMessageBox::warning(this, tr("Disconnected"), tr("The host terminated the connection"));
+            showMessageBox(tr("Disconnected"), tr("The host terminated the connection"), QMessageBox::Warning);
             return; // handled by disconnectedFromServer
         case QAbstractSocket::ConnectionRefusedError:
-            QMessageBox::critical(this, tr("Error"), tr("The host refused the connection"));
+            showMessageBox(tr("Error"), tr("The host refused the connection"), QMessageBox::Critical);
             break;
         case QAbstractSocket::ProxyConnectionRefusedError:
-            QMessageBox::critical(this, tr("Error"), tr("The proxy refused the connection"));
+            showMessageBox(tr("Error"), tr("The proxy refused the connection"), QMessageBox::Critical);
             break;
         case QAbstractSocket::ProxyNotFoundError:
-            QMessageBox::critical(this, tr("Error"), tr("Could not find the proxy"));
+            showMessageBox(tr("Error"), tr("Could not find the proxy"), QMessageBox::Critical);
             break;
         case QAbstractSocket::HostNotFoundError:
-            QMessageBox::critical(this, tr("Error"), tr("Could not find the server"));
+            showMessageBox(tr("Error"), tr("Could not find the server"), QMessageBox::Critical);
             break;
         case QAbstractSocket::SocketAccessError:
-            QMessageBox::critical(this, tr("Error"), tr("You don't have permissions to execute this operation"));
+            showMessageBox(tr("Error"), tr("You don't have permissions to execute this operation"),
+                           QMessageBox::Critical);
             break;
         case QAbstractSocket::SocketResourceError:
-            QMessageBox::critical(this, tr("Error"), tr("Too many connections opened"));
+            showMessageBox(tr("Error"), tr("Too many connections opened"), QMessageBox::Critical);
             break;
         case QAbstractSocket::SocketTimeoutError:
-            QMessageBox::warning(this, tr("Error"), tr("Operation timed out"));
+            showMessageBox(tr("Error"), tr("Operation timed out"), QMessageBox::Warning);
             return;
         case QAbstractSocket::ProxyConnectionTimeoutError:
-            QMessageBox::critical(this, tr("Error"), tr("Proxy timed out"));
+            showMessageBox(tr("Error"), tr("Proxy timed out"), QMessageBox::Critical);
             break;
         case QAbstractSocket::NetworkError:
-            QMessageBox::critical(this, tr("Error"), tr("Unable to reach the network"));
+            showMessageBox(tr("Error"), tr("Unable to reach the network"), QMessageBox::Critical);
             break;
         case QAbstractSocket::UnknownSocketError:
-            QMessageBox::critical(this, tr("Error"), tr("An unknown error occurred"));
+            showMessageBox(tr("Error"), tr("An unknown error occurred"), QMessageBox::Critical);
             break;
         case QAbstractSocket::UnsupportedSocketOperationError:
-            QMessageBox::critical(this, tr("Error"), tr("Operation not supported"));
+            showMessageBox(tr("Error"), tr("Operation not supported"), QMessageBox::Critical);
             break;
         case QAbstractSocket::ProxyAuthenticationRequiredError:
-            QMessageBox::critical(this, tr("Error"), tr("Your proxy requires authentication"));
+            showMessageBox(tr("Error"), tr("Your proxy requires authentication"), QMessageBox::Critical);
             break;
         case QAbstractSocket::ProxyProtocolError:
-            QMessageBox::critical(this, tr("Error"), tr("Proxy communication failed"));
+            showMessageBox(tr("Error"), tr("Proxy communication failed"), QMessageBox::Critical);
             break;
         case QAbstractSocket::TemporaryError:
         case QAbstractSocket::OperationError:
-            QMessageBox::warning(this, tr("Error"), tr("Operation failed, please try again"));
+            showMessageBox(tr("Error"), tr("Operation failed, please try again"), QMessageBox::Warning);
             return;
         default:
             Q_UNREACHABLE();
@@ -270,22 +296,39 @@ void MainWindow::error(QAbstractSocket::SocketError socketError) {
     ui->pushButton_sendMessage->hide();
     ui->lineEdit->setDisabled(true);
     ui->tabWidget->setDisabled(true);
+    ui->pushButton_connect->setEnabled(true);
     ui->statusBar->showMessage("Ожидание подключения");
 }
 
 void MainWindow::prepareTabWidget() {
     otherSockets.clear();
-    for (auto &i : textBrowsers) {
-        delete i;
+    for (auto &i: textBrowsers) {
+        i->deleteLater();
     }
     textBrowsers.clear();
     ui->tabWidget->clear();
-//    while (ui->tabWidget->count()) {
-//        ui->tabWidget->removeTab(0);
-//    }
 
     otherSockets.push_back(TransferProtocol::ALL);
     createTabWidget(TransferProtocol::ALL);
     otherSockets.push_back(TransferProtocol::SERVER);
     createTabWidget(TransferProtocol::SERVER);
+}
+
+void MainWindow::showMessageBox(const QString &title, const QString &text, const QMessageBox::Icon &icon) {
+    QMessageBox box(this);
+    box.setObjectName("MainWindow");
+    box.setIcon(icon);
+    box.setText(text);
+    auto *btn = new MyButton("OK");
+    box.addButton(btn, QMessageBox::YesRole);
+    box.exec();
+    btn->deleteLater();
+}
+
+void MainWindow::keyPressEvent(QKeyEvent *event) {
+    if (ui->pushButton_connect->hasFocus() && event->key() == Qt::Key_Return) {
+        ui->pushButton_connect->click();
+        return;
+    }
+    QWidget::keyPressEvent(event);
 }

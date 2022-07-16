@@ -14,25 +14,36 @@
    <string>Client</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0" colspan="2">
+    <widget class="MyTabWidget" name="tabWidget">
+     <property name="documentMode">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" colspan="2">
+    <widget class="MyLineEdit" name="lineEdit">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
    <item row="2" column="0">
-    <widget class="QPushButton" name="pushButton_sendMessage">
+    <widget class="MyButton" name="pushButton_sendMessage">
+     <property name="focusPolicy">
+      <enum>Qt::NoFocus</enum>
+     </property>
      <property name="text">
       <string>Отправить сообщение</string>
      </property>
     </widget>
    </item>
    <item row="2" column="1">
-    <widget class="QPushButton" name="pushButton_connect">
+    <widget class="MyButton" name="pushButton_connect">
      <property name="text">
       <string>Подключиться</string>
      </property>
     </widget>
-   </item>
-   <item row="1" column="0" colspan="2">
-    <widget class="QLineEdit" name="lineEdit"/>
-   </item>
-   <item row="0" column="0" colspan="2">
-    <widget class="VerticalTabWidget" name="tabWidget"/>
    </item>
    <item row="3" column="0" colspan="2">
     <widget class="QStatusBar" name="statusBar"/>
@@ -41,9 +52,19 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>VerticalTabWidget</class>
+   <class>MyLineEdit</class>
+   <extends>QLineEdit</extends>
+   <header>MyLineEdit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>MyButton</class>
+   <extends>QPushButton</extends>
+   <header>MyButton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>MyTabWidget</class>
    <extends>QTabWidget</extends>
-   <header>verticaltabwidget.h</header>
+   <header>MyTabWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -3,14 +3,13 @@
 
 #include <QWidget>
 #include <QAbstractSocket>
+#include <QMessageBox>
 
 class QTextBrowser;
 
 class QShortcut;
 
 class QTcpSocket;
-
-class VerticalTabWidget;
 
 class ClientConnection;
 
@@ -59,6 +58,10 @@ private slots:
 
     void showMessage(const QString &msg, MainWindow::SHOW_MESSAGE_TYPE messageType, int ind);
 
+protected:
+
+    void keyPressEvent(QKeyEvent *event) override;
+
 signals:
 
     void newMessage(const QString &msg, MainWindow::SHOW_MESSAGE_TYPE messageType, int ind);
@@ -77,6 +80,8 @@ private:
     void createTabWidget(const QString &title);
 
     void prepareTabWidget();
+
+    void showMessageBox(const QString &title, const QString &text, const QMessageBox::Icon &icon);
 };
 
 

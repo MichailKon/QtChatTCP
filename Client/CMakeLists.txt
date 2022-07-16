@@ -13,15 +13,16 @@ find_package(Qt6 COMPONENTS
         Gui
         Widgets
         Network
+        Quick
         REQUIRED)
 
-file(COPY css DESTINATION .)
+file(COPY qss DESTINATION .)
 
-include_directories(headers uis ../UsefulThings/headers ../UsefulThings/src ../)
+include_directories(headers uis ..)
 
-set(SOURCES ${SOURCES} src/ChooseAddressPort.cpp src/MainWindow.cpp src/VerticalTabBar.cpp src/VerticalTabWidget.cpp src/ClientConnection.cpp ../TransferProtocol.cpp)
-set(HEADERS ${HEADERS} headers/ChooseAddressPort.h headers/MainWindow.h headers/VerticalTabBar.h headers/VerticalTabWidget.h headers/ClientConnection.h ../TransferProtocol.h)
-set(UIS ${UIS} uis/ChooseAddressPort.ui uis/MainWindow.ui)
+set(SOURCES ${SOURCES} src/ChooseAddressPort.cpp src/MainWindow.cpp src/ClientConnection.cpp ../TransferProtocol.cpp src/MyButton.cpp src/MyLineEdit.cpp src/ChooseName.cpp src/MyTabBar.cpp src/MyTabWidget.cpp)
+set(HEADERS ${HEADERS} headers/ChooseAddressPort.h headers/MainWindow.h headers/ClientConnection.h ../TransferProtocol.h headers/MyButton.h headers/MyLineEdit.h headers/ChooseName.h headers/MyTabBar.h headers/MyTabWidget.h)
+set(UIS ${UIS} uis/ChooseAddressPort.ui uis/MainWindow.ui uis/ChooseName.ui)
 
 add_executable(Client src/main.cpp ${SOURCES} ${HEADERS} ${UIS})
 
@@ -30,6 +31,7 @@ target_link_libraries(Client
         Qt::Gui
         Qt::Widgets
         Qt::Network
+        Qt::Quick
         )
 
 target_include_directories(Client PRIVATE headers uis ..)
